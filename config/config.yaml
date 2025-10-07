@@ -1,0 +1,19 @@
+seed: 42
+horizon_days: 365
+splits:
+  train_start: "2015-01-01"
+  train_end:   "2017-12-31"
+  valid_start: "2018-01-01"
+  valid_end:   "2018-12-31"
+  test_start:  "2019-01-01"
+  test_end:    "2019-12-31"
+  stress_start:"2020-01-01"
+  stress_end:  "2020-09-30"
+paths:
+  raw: "data/raw"
+  processed: "data/processed"
+  models: "models"
+  reports: "reports"
+target:
+  name: "default_12m"
+  definition: "charge_off_or_90dpd_within_12m_from_issue_d"
