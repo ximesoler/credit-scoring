@@ -1,0 +1,25 @@
+# --- datos pesados ---
+data/**
+!data/.gitkeep
+
+nb/data/**
+!nb/data/.gitkeep
+
+models/**
+!models/.gitkeep
+
+reports/**
+!reports/.gitkeep
+
+# --- archivos temporales ---
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# --- datos pesados específicos ---
+**/*.parquet
+**/*.csv
+**/*.csv.gz
+
