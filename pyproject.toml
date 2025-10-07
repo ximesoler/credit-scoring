@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "scoring"
+version = "0.1.0"
+description = ""
+authors = ["ximena"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.13"
+kagglehub = "^0.3.13"
+pandas = "^2.3.3"
+openpyxl = "^3.1.5"
+matplotlib = "^3.10.6"
+pyarrow = "^21.0.0"
+fastparquet = "^2024.11.0"
+scikit-learn = "^1.7.2"
+xgboost = "2.1.2"
+numpy = "<2"
+shap = "^0.48.0"
+
+
+[tool.poetry.group.dev.dependencies]
+jupyter = "^1.1.1"
+ruff = "^0.13.3"
+black = "^25.9.0"
+pre-commit = "^4.3.0"
+pytest = "^8.4.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
