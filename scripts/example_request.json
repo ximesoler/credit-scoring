@@ -1,0 +1,23 @@
+{
+  "fico_mid": 720,
+  "dti": 25.5,
+  "home_ownership": "MORTGAGE",
+  "verification_status": "Verified",
+  "inq_last_6mths_bin": "1",
+  "emp_length_yrs": 5,
+  "loan_to_income_bin": "low",
+  "install_to_income_bin": "medium",
+  "avg_cur_bal_bin": "high",
+  "acc_open_past_24mths": 3,
+  "bc_open_to_buy": 15000,
+  "mo_sin_old_rev_tl_op": 120,
+  "mo_sin_rcnt_rev_tl_op": 6,
+  "mo_sin_rcnt_tl": 3,
+  "mort_acc": 1,
+  "mths_since_recent_bc": 2,
+  "mths_since_recent_inq": 4,
+  "num_actv_rev_tl": 8,
+  "num_tl_op_past_12m": 2,
+  "open_rv_24m": 1,
+  "total_bc_limit": 25000
+}
