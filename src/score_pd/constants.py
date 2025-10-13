@@ -87,13 +87,13 @@ FEATURE_CONSTRAINTS: Dict[str, Dict] = {
 
 # Valid categorical values
 VALID_CATEGORICAL_VALUES: Dict[str, List[str]] = {
-    'home_ownership': ['RENT', 'MORTGAGE', 'OWN', 'OTHER'],
-    'verification_status': ['Verified', 'Not Verified', 'Source Verified'],
-    'inq_last_6mths_bin': ['0', '1', '2', '3', '4+'],
-    'inq_last_12m_bin': ['0', '1', '2', '3', '4+'],
-    'install_to_income_bin': ['low', 'medium', 'high'],
-    'loan_to_income_bin': ['low', 'medium', 'high'],
-    'avg_cur_bal_bin': ['low', 'medium', 'high']
+    'home_ownership': ['RENT', 'MORTGAGE', 'OWN', 'OTHER', 'ANY', 'NONE'],
+    'verification_status': ['verified', 'not_verified', 'source_verified'],
+    'inq_last_6mths_bin': ['0_001_1_0', '1_0_2_0', '2_0_inf', 'no_info'],
+    'inq_last_12m_bin': ['0_002_1_0', '1_0_4_0', '4_0_inf'],
+    'install_to_income_bin': ['0_00101_0_02', '0_02_0_04', '0_04_0_07', '0_07_0_1', '0_1_inf'],
+    'loan_to_income_bin': ['0_001_0_04', '0_04_0_08', '0_08_0_12', '0_12_0_16', '0_16_0_22', '0_22_0_3', '0_3_inf'],
+    'avg_cur_bal_bin': ['0_001_11000_0', '11000_0_15000_0', '15000_0_25000_0', '25000_0_30000_0', '30000_0_inf', 'no_info']
 }
 
 # Model paths
