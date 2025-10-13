@@ -321,12 +321,12 @@ class WOEAnalysis:
 
 class ModelEvaluation:
     """Model evaluation metrics and analysis"""
-    
+
     def ks_statistic(self, y_true, y_pred):
         """Kolmogorov-Smirnov statistic"""
         fpr, tpr, _ = roc_curve(y_true, y_pred)
         return np.max(np.abs(tpr - fpr))
-    
+
     def comprehensive_metrics(self, y_true, y_pred, dataset_name=""):
         """Calculate all evaluation metrics"""
         from sklearn.metrics import average_precision_score
@@ -337,74 +337,238 @@ class ModelEvaluation:
             f"KS_{dataset_name}": self.ks_statistic(y_true, y_pred),
         }
         return metrics
-    
-    def plot_ks_curve(self, y_true, y_pred, model_name, ax=None):
-        """Plot K-S curve showing separation between cumulative distributions"""
-        fpr, tpr, thresholds = roc_curve(y_true, y_pred)
         
-        ks_stat = np.max(tpr - fpr)
-        ks_idx = np.argmax(tpr - fpr)
-        ks_threshold = thresholds[ks_idx]
+    def plot_ks_curve_deciles(self, y_true, y_pred, model_name, ax=None):
+        """Plot K-S curve using decile approach (common in credit scoring)"""
+        
+        # Create dataframe
+        df = pd.DataFrame({
+            'score': y_pred,
+            'target': y_true
+        })
+        
+        # Sort by score descending and create deciles
+        df = df.sort_values('score', ascending=False).reset_index(drop=True)
+        df['decile'] = pd.qcut(df['score'], q=10, labels=False, duplicates='drop') + 1
+        
+        # Calculate cumulative distributions by decile
+        decile_stats = df.groupby('decile').agg({
+            'target': ['sum', 'count']
+        }).reset_index()
+        decile_stats.columns = ['decile', 'defaults', 'total']
+        decile_stats['non_defaults'] = decile_stats['total'] - decile_stats['defaults']
+        
+        # Cumulative percentages
+        decile_stats['cum_defaults_pct'] = decile_stats['defaults'].cumsum() / decile_stats['defaults'].sum()
+        decile_stats['cum_non_defaults_pct'] = decile_stats['non_defaults'].cumsum() / decile_stats['non_defaults'].sum()
+        decile_stats['ks'] = np.abs(decile_stats['cum_defaults_pct'] - decile_stats['cum_non_defaults_pct'])
+        
+        max_ks = decile_stats['ks'].max()
+        max_ks_decile = decile_stats.loc[decile_stats['ks'].idxmax(), 'decile']
         
         if ax is None:
             fig, ax = plt.subplots(figsize=(10, 6))
         
-        ax.plot(thresholds, tpr, label='True Positive Rate (Good Loans)', linewidth=2)
-        ax.plot(thresholds, fpr, label='False Positive Rate (Bad Loans)', linewidth=2)
-        ax.plot(thresholds, tpr - fpr, label='K-S Statistic', linewidth=2, linestyle='--', color='red')
+        # Plot
+        ax.plot(decile_stats['decile'], decile_stats['cum_defaults_pct'] * 100, 
+                marker='o', label='% Defaults Captured', linewidth=2, color='red')
+        ax.plot(decile_stats['decile'], decile_stats['cum_non_defaults_pct'] * 100,
+                marker='s', label='% Non-Defaults Captured', linewidth=2, color='blue')
+        ax.plot(decile_stats['decile'], decile_stats['ks'] * 100,
+                marker='^', label='K-S', linewidth=2, color='green', linestyle='--')
         
-        ax.axvline(ks_threshold, color='green', linestyle=':', linewidth=2, 
-                   label=f'Max K-S at {ks_threshold:.3f}')
-        ax.scatter([ks_threshold], [ks_stat], color='green', s=200, zorder=5, 
-                   marker='*', edgecolor='black', linewidth=1.5)
+        ax.axhline(max_ks * 100, color='green', linestyle=':', alpha=0.5)
+        ax.axvline(max_ks_decile, color='green', linestyle=':', alpha=0.5)
         
-        ax.annotate(f'K-S = {ks_stat:.4f}', 
-                    xy=(ks_threshold, ks_stat), 
-                    xytext=(ks_threshold + 0.1, ks_stat - 0.05),
-                    fontsize=11, fontweight='bold',
-                    bbox=dict(boxstyle='round,pad=0.5', facecolor='yellow', alpha=0.7),
-                    arrowprops=dict(arrowstyle='->', color='black', lw=1.5))
-        
-        ax.set_xlabel('Threshold', fontsize=12)
-        ax.set_ylabel('Rate', fontsize=12)
-        ax.set_title(f'{model_name} - K-S Curve (Validation Set)', fontsize=14, fontweight='bold')
+        ax.set_xlabel('Score Decile (1=Highest Risk, 10=Lowest Risk)', fontsize=12)
+        ax.set_ylabel('Cumulative %', fontsize=12)
+        ax.set_title(f'{model_name} - K-S Curve by Decile (Max K-S = {max_ks:.3f})', 
+                    fontsize=14, fontweight='bold')
         ax.legend(loc='best', fontsize=10)
         ax.grid(True, alpha=0.3)
-        ax.set_xlim([0, 1])
-        ax.set_ylim([0, 1])
+        ax.set_xticks(range(1, 11))
         
-        return ks_stat, ks_threshold
+        return max_ks, max_ks_decile
     
-    def decile_ks_analysis(self, y_true, y_pred):
-        """Calculate K-S statistics by deciles for detailed analysis"""
+    def create_scorecard_table(self, y_true, y_pred, model_name="Model"):
+        """
+        Create traditional credit scorecard table with decile analysis
+        """
         df = pd.DataFrame({
-            'y_true': y_true,
-            'y_pred': y_pred
+            'score': y_pred,
+            'target': y_true
         })
         
-        df['decile'] = pd.qcut(df['y_pred'], q=10, labels=False, duplicates='drop') + 1
+        # Sort by score ASCENDING (lowest risk first) and create deciles
+        df = df.sort_values('score', ascending=True).reset_index(drop=True)
+        df['decile'] = pd.qcut(df['score'], q=10, labels=False, duplicates='drop') + 1
         
-        decile_stats = df.groupby('decile').agg({
-            'y_true': ['count', 'sum', 'mean']
-        }).reset_index()
-        
-        decile_stats.columns = ['Decile', 'Count', 'Defaults', 'Default_Rate']
+        decile_stats = []
         
         total_goods = (y_true == 0).sum()
         total_bads = (y_true == 1).sum()
+        total_population = len(y_true)
         
-        decile_stats['Cum_Goods'] = 0
-        decile_stats['Cum_Bads'] = 0
+        cum_goods = 0
+        cum_bads = 0
+        cum_population = 0
         
-        for i in range(len(decile_stats)):
-            mask = df['decile'] <= decile_stats.loc[i, 'Decile']
-            decile_stats.loc[i, 'Cum_Goods'] = ((df.loc[mask, 'y_true'] == 0).sum() / total_goods) * 100
-            decile_stats.loc[i, 'Cum_Bads'] = ((df.loc[mask, 'y_true'] == 1).sum() / total_bads) * 100
+        for decile in range(1, 11):
+            decile_data = df[df['decile'] == decile]
+            
+            n_total = len(decile_data)
+            n_bads = (decile_data['target'] == 1).sum()
+            n_goods = (decile_data['target'] == 0).sum()
+            
+            cum_population += n_total
+            cum_goods += n_goods
+            cum_bads += n_bads
+            
+            # Calculate metrics
+            pct_population = (n_total / total_population) * 100
+            pct_cum_population = (cum_population / total_population) * 100
+            
+            pct_goods = (cum_goods / total_goods) * 100
+            pct_bads = (cum_bads / total_bads) * 100
+            
+            default_rate = (n_bads / n_total * 100) if n_total > 0 else 0
+            
+            # Odds = Goods / Bads
+            odds = (n_goods / n_bads) if n_bads > 0 else 999
+            
+            # K-S = |% Goods - % Bads|
+            ks = abs(pct_goods - pct_bads)
+            
+            # ICC (Information Capture Curve) - cumulative information value
+            if n_bads > 0 and n_goods > 0:
+                dist_bads = n_bads / total_bads
+                dist_goods = n_goods / total_goods
+                icc = (dist_bads - dist_goods) * np.log(dist_bads / dist_goods) if dist_goods > 0 else 0
+            else:
+                icc = 0
+            
+            # Score range for this decile
+            min_score = decile_data['score'].min()
+            max_score = decile_data['score'].max()
+            
+            decile_stats.append({
+                'Variable': f'{min_score:.2%}-{max_score:.2%}',
+                'Total_All': n_total,
+                '%INT_All': pct_population,
+                '%AC_All': pct_cum_population,
+                'Total_Goods': n_goods,
+                '%INT_Goods': (n_goods / total_goods * 100),
+                '%AC_Goods': pct_goods,
+                'Total_Bads': n_bads,
+                '%INT_Bads': (n_bads / total_bads * 100),
+                '%AC_Bads': pct_bads,
+                'ODDS': odds,
+                'K-S': ks,
+                'ICC': icc,
+            })
         
-        decile_stats['K-S'] = decile_stats['Cum_Bads'] - decile_stats['Cum_Goods']
-        decile_stats['Default_Rate'] = decile_stats['Default_Rate'] * 100
+        result_df = pd.DataFrame(decile_stats)
         
-        return decile_stats
+        # Calculate summary metrics
+        max_ks = result_df['K-S'].max()
+        max_ks_decile = result_df['K-S'].idxmax() + 1
+        gini = 2 * roc_auc_score(y_true, y_pred) - 1
+        ar = roc_auc_score(y_true, y_pred)
+        
+        print(f"\n{'='*80}")
+        print(f"{model_name} - Scorecard Analysis")
+        print(f"{'='*80}")
+        print(f"K-S:   {max_ks:.2f}%")
+        print(f"AR:    {ar:.2%}")
+        print(f"GINI:  {gini:.2%}")
+        print(f"{'='*80}\n")
+        
+        return result_df
+
+
+    def decile_ks_analysis(self, y_true, y_pred, model_name="Model"):
+
+        result_df = self.create_scorecard_table(y_true, y_pred, model_name)
+        """
+        Display scorecard table with exact styling from the image
+        """
+        import pandas as pd
+        
+        # Create multi-level column structure
+        display_data = []
+        
+        for idx, row in result_df.iterrows():
+            display_data.append({
+                ('Segment', 'Variable'): row['Variable'],
+                ('All', 'Total'): int(row['Total_All']),
+                ('All', '%INT'): f"{row['%INT_All']:.2f}%",
+                ('All', '%AC'): f"{row['%AC_All']:.2f}%",
+                ('Goods', 'Total'): int(row['Total_Goods']),
+                ('Goods', '%INT'): f"{row['%INT_Goods']:.2f}%",
+                ('Goods', '%AC'): f"{row['%AC_Goods']:.2f}%",
+                ('Bads', 'Total'): int(row['Total_Bads']),
+                ('Bads', '%INT'): row['%INT_Bads'],  # Keep as float for coloring
+                ('Bads', '%AC'): f"{row['%AC_Bads']:.2f}%",
+                ('Metrics', 'ODDS'): f"{row['ODDS']:.2f}",
+                ('Metrics', 'K-S'): f"{row['K-S']:.2f}%",
+            })
+        
+        display_df = pd.DataFrame(display_data)
+
+        def color_gradient(val):
+            """Apply gradient from green (low) to red (high) for default rates"""
+            try:
+
+                if isinstance(val, str):
+                    val = float(val.replace('%', ''))
+                
+                if val < 1:
+                    return 'background-color: #00551a; color: white'  # Dark green
+                elif val < 2:
+                    return 'background-color: #007a2d; color: white'  # Green
+                elif val < 3:
+                    return 'background-color: #00a83f; color: white'  # Medium green
+                elif val < 5:
+                    return 'background-color: #4db36f'  # Light green
+                elif val < 7:
+                    return 'background-color: #80c995'  # Very light green
+                elif val < 10:
+                    return 'background-color: #ffeb99'  # Light yellow
+                elif val < 15:
+                    return 'background-color: #ffcc66'  # Yellow-orange
+                elif val < 20:
+                    return 'background-color: #ff9933'  # Orange
+                else:
+                    return 'background-color: #cc0000; color: white'  # Dark red
+            except:
+                return ''
+        
+        styled = display_df.style.applymap(
+            color_gradient, 
+            subset=[('Bads', '%INT')]
+        ).set_properties(**{
+            'text-align': 'center',
+            'border': '1px solid #ddd'
+        }).set_table_styles([
+            {'selector': 'th', 'props': [
+                ('background-color', "#0a0909"),
+                ('font-weight', 'bold'),
+                ('text-align', 'center'),
+                ('border', '1px solid #ddd')
+            ]}
+        ])
+        
+        def format_pct(val):
+            try:
+                if isinstance(val, (int, float)):
+                    return f"{val:.2f}%"
+                return val
+            except:
+                return val
+        
+        styled = styled.format(format_pct, subset=[('Bads', '%INT')])
+        
+        return styled
 
 
 class BusinessAnalysis:
